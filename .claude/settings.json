@@ -1,0 +1,25 @@
+{
+  "enableAllProjectMcpServers": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /home/agent/.gate-handler.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /home/agent/.read-before-edit.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}
