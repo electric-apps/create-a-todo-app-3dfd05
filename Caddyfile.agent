@@ -1,0 +1,40 @@
+{
+	# Auto HTTPS with internal (self-signed) CA for local dev
+	auto_https disable_redirects
+	admin off
+	# Default SNI so Caddy generates a cert for the right name even when
+	# clients connect without SNI (some health-check tools)
+	default_sni localhost
+}
+
+# Public HTTPS endpoint — this is what the host sees as the preview port.
+# Caddy terminates TLS and multiplexes HTTP/2 streams to Vite, fixing the
+# Chrome per-origin SSE connection limit (~6 on HTTP/1.1). Electric SQL
+# apps open many SSE streams (one per shape + Durable Streams + StreamDB
+# + Yjs providers) so HTTP/1.1 stalls quickly — HTTP/2 multiplexes them
+# over a single TCP connection.
+#
+# Note: we name the site `localhost` (not `:5173`) so Caddy's internal CA
+# generates a certificate whose SAN matches the `localhost` SNI that the
+# browser sends — otherwise the TLS handshake fails with alert 80
+# ("internal error" — really: no matching cert).
+localhost:5173, 127.0.0.1:5173 {
+	tls internal
+
+	# WebSocket/HMR support — Vite uses WS for HMR, and reverse_proxy in
+	# Caddy supports the WebSocket upgrade out of the box.
+	reverse_proxy localhost:5174 {
+		# Forward the original host so Vite doesn't complain about allowedHosts.
+		# If Vite rejects with "Blocked request" the fix is to add
+		# `allowedHosts: ["localhost", ".localhost"]` to vite.config.ts.
+		header_up Host {http.request.host}
+	}
+}
+
+# Internal cleartext HTTP endpoint — only exposed via a separate container
+# port mapping so tools that can't handle self-signed certs (automated
+# tests, curl scripts, etc.) can still hit the Vite dev server directly.
+# NOT announced to the user or shown in logs.
+:5180 {
+	reverse_proxy localhost:5174
+}
